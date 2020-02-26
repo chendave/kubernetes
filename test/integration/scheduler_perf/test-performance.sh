@@ -43,7 +43,7 @@ if ${RUN_BENCHMARK:-false}; then
   go test -c -o "perf.test"
 
   kube::log::status "performance test (benchmark) start"
-  "./perf.test" -test.bench=. -test.run=xxxx -test.cpuprofile=prof.out -test.short=false
+  "./perf.test" -test.bench=. -test.run=BenchmarkExtraSchedulingSecrets -test.cpuprofile=prof.out -test.short=false
   kube::log::status "...benchmark tests finished"
 fi
 # Running density tests. It might take a long time.

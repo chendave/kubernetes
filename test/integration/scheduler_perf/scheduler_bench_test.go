@@ -98,7 +98,7 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 // volumes that don't require any special handling, such as Secrets.
 // It can be used to compare scheduler efficiency with the other benchmarks
 // that use volume scheduling predicates.
-func BenchmarkSchedulingSecrets(b *testing.B) {
+func BenchmarkExtraSchedulingSecrets(b *testing.B) {
 	// The test strategy creates pods with a secret.
 	testBasePod := makeBasePodWithSecret()
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
