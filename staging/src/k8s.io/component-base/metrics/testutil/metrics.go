@@ -35,7 +35,9 @@ var (
 	// MetricNameLabel is label under which model.Sample stores metric name
 	MetricNameLabel model.LabelName = model.MetricNameLabel
 	// QuantileLabel is label under which model.Sample stores latency quantile value
-	QuantileLabel model.LabelName = model.QuantileLabel
+	QuantileLabel                             model.LabelName = model.QuantileLabel
+	frameworkExtensionPointDurationMetricName                 = "scheduler_framework_extension_point_duration_seconds"
+	ExtensionPointLabelName                                   = "extension_point"
 )
 
 // Metrics is generic metrics for other specific metrics
@@ -178,11 +180,13 @@ type Histogram struct {
 
 // GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (Histogram, error) {
+func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (map[string]Histogram, error) {
 	var metricFamily *dto.MetricFamily
+	var histMap map[string]Histogram
+	histMap = make(map[string]Histogram)
 	m, err := gatherer.Gather()
 	if err != nil {
-		return Histogram{}, err
+		return histMap, err
 	}
 	for _, mFamily := range m {
 		if mFamily.GetName() == metricName {
@@ -192,23 +196,34 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (His
 	}
 
 	if metricFamily == nil {
-		return Histogram{}, fmt.Errorf("metric %q not found", metricName)
-	}
-
-	if metricFamily.GetMetric() == nil {
-		return Histogram{}, fmt.Errorf("metric %q is empty", metricName)
+		return histMap, fmt.Errorf("metric %q not found", metricName)
 	}
 
 	if len(metricFamily.GetMetric()) == 0 {
-		return Histogram{}, fmt.Errorf("metric %q is empty", metricName)
+		return histMap, fmt.Errorf("metric %q is empty", metricName)
 	}
 
-	return Histogram{
+	metrics := metricFamily.GetMetric()
+	if metricName == frameworkExtensionPointDurationMetricName {
+		for _, metric := range metrics {
+			for _, label := range metric.GetLabel() {
+				if label.GetName() == ExtensionPointLabelName {
+					name := fmt.Sprintf("%s/%s", frameworkExtensionPointDurationMetricName, label.GetValue())
+					histMap[name] = Histogram{
+						metric.GetHistogram(),
+					}
+				}
+			}
+		}
+	} else {
 		// Histograms are stored under the first index (based on observation).
 		// Given there's only one histogram registered per each metric name, accessing
 		// the first index is sufficient.
-		metricFamily.GetMetric()[0].GetHistogram(),
-	}, nil
+		histMap[metricName] = Histogram{
+			metrics[0].GetHistogram(),
+		}
+	}
+	return histMap, nil
 }
 
 func uint64Ptr(u uint64) *uint64 {

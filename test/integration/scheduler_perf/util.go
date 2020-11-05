@@ -166,55 +166,55 @@ func (*metricsCollector) run(ctx context.Context) {
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
 	for _, metric := range pc.Metrics {
-		dataItem := collectHistogram(metric, pc.labels)
-		if dataItem != nil {
-			dataItems = append(dataItems, *dataItem)
-		}
+		itemCollection := collectHistogram(metric, pc.labels)
+		dataItems = append(dataItems, itemCollection...)
 	}
 	return dataItems
 }
 
-func collectHistogram(metric string, labels map[string]string) *DataItem {
-	hist, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric)
+func collectHistogram(metric string, labels map[string]string) []DataItem {
+	var dataItems []DataItem
+	histMap, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric)
 	if err != nil {
 		klog.Error(err)
 		return nil
 	}
-	if hist.Histogram == nil {
-		klog.Errorf("metric %q is not a Histogram metric", metric)
-		return nil
-	}
-	if err := hist.Validate(); err != nil {
-		klog.Error(err)
-		return nil
+	for label, hist := range histMap {
+		if err := hist.Validate(); err != nil {
+			klog.Error(err)
+			return nil
+		}
+
+		q50 := hist.Quantile(0.50)
+		q90 := hist.Quantile(0.90)
+		q99 := hist.Quantile(0.95)
+		avg := hist.Average()
+
+		// clear the metrics so that next test always starts with empty prometheus
+		// metrics (since the metrics are shared among all tests run inside the same binary)
+		hist.Clear()
+
+		msFactor := float64(time.Second) / float64(time.Millisecond)
+
+		// Copy labels and add "Metric" label for this metric.
+		labelMap := map[string]string{"Metric": label}
+		for k, v := range labels {
+			labelMap[k] = v
+		}
+		dataItem := &DataItem{
+			Labels: labelMap,
+			Data: map[string]float64{
+				"Perc50":  q50 * msFactor,
+				"Perc90":  q90 * msFactor,
+				"Perc99":  q99 * msFactor,
+				"Average": avg * msFactor,
+			},
+			Unit: "ms",
+		}
+		dataItems = append(dataItems, *dataItem)
 	}
 
-	q50 := hist.Quantile(0.50)
-	q90 := hist.Quantile(0.90)
-	q99 := hist.Quantile(0.95)
-	avg := hist.Average()
-
-	// clear the metrics so that next test always starts with empty prometheus
-	// metrics (since the metrics are shared among all tests run inside the same binary)
-	hist.Clear()
-
-	msFactor := float64(time.Second) / float64(time.Millisecond)
-
-	// Copy labels and add "Metric" label for this metric.
-	labelMap := map[string]string{"Metric": metric}
-	for k, v := range labels {
-		labelMap[k] = v
-	}
-	return &DataItem{
-		Labels: labelMap,
-		Data: map[string]float64{
-			"Perc50":  q50 * msFactor,
-			"Perc90":  q90 * msFactor,
-			"Perc99":  q99 * msFactor,
-			"Average": avg * msFactor,
-		},
-		Unit: "ms",
-	}
+	return dataItems
 }
 
 type throughputCollector struct {
