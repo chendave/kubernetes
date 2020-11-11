@@ -47,6 +47,10 @@ const (
 	testNamespace             = "sched-test"
 	setupNamespace            = "sched-setup"
 	throughputSampleFrequency = time.Second
+	// FrameworkExtensionPointDurationMetricName is the metric name of scheduler extension point.
+	FrameworkExtensionPointDurationMetricName = "scheduler_framework_extension_point_duration_seconds"
+	// ExtensionPointLabelName is the label name of extension point metrics.
+	ExtensionPointLabelName = "extension_point"
 )
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
@@ -174,7 +178,10 @@ func (pc *metricsCollector) collect() []DataItem {
 
 func collectHistogram(metric string, labels map[string]string) []DataItem {
 	var dataItems []DataItem
-	histMap, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric)
+	metricLabelMap := map[string]string{
+		FrameworkExtensionPointDurationMetricName: ExtensionPointLabelName,
+	}
+	histMap, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric, metricLabelMap)
 	if err != nil {
 		klog.Error(err)
 		return nil

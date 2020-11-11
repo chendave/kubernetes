@@ -35,9 +35,7 @@ var (
 	// MetricNameLabel is label under which model.Sample stores metric name
 	MetricNameLabel model.LabelName = model.MetricNameLabel
 	// QuantileLabel is label under which model.Sample stores latency quantile value
-	QuantileLabel                             model.LabelName = model.QuantileLabel
-	frameworkExtensionPointDurationMetricName                 = "scheduler_framework_extension_point_duration_seconds"
-	ExtensionPointLabelName                                   = "extension_point"
+	QuantileLabel model.LabelName = model.QuantileLabel
 )
 
 // Metrics is generic metrics for other specific metrics
@@ -180,7 +178,7 @@ type Histogram struct {
 
 // GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (map[string]Histogram, error) {
+func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, metricLabelMap map[string]string) (map[string]Histogram, error) {
 	var metricFamily *dto.MetricFamily
 	var histMap map[string]Histogram
 	histMap = make(map[string]Histogram)
@@ -204,11 +202,15 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (map
 	}
 
 	metrics := metricFamily.GetMetric()
-	if metricName == frameworkExtensionPointDurationMetricName {
+	labelName, ok := metricLabelMap[metricName]
+	// This MetricFamily has the desired label defined, we should collect
+	// all the metrics from the MetricFamily which is associated with the
+	// the label.
+	if ok {
 		for _, metric := range metrics {
 			for _, label := range metric.GetLabel() {
-				if label.GetName() == ExtensionPointLabelName {
-					name := fmt.Sprintf("%s/%s", frameworkExtensionPointDurationMetricName, label.GetValue())
+				if label.GetName() == labelName {
+					name := fmt.Sprintf("%s/%s", metricName, label.GetValue())
 					histMap[name] = Histogram{
 						metric.GetHistogram(),
 					}
@@ -217,8 +219,7 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string) (map
 		}
 	} else {
 		// Histograms are stored under the first index (based on observation).
-		// Given there's only one histogram registered per each metric name, accessing
-		// the first index is sufficient.
+		// No label is provided, assume the first index is sufficient.
 		histMap[metricName] = Histogram{
 			metrics[0].GetHistogram(),
 		}
