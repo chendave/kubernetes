@@ -47,10 +47,6 @@ const (
 	testNamespace             = "sched-test"
 	setupNamespace            = "sched-setup"
 	throughputSampleFrequency = time.Second
-	// FrameworkExtensionPointDurationMetricName is the metric name of scheduler extension point.
-	FrameworkExtensionPointDurationMetricName = "scheduler_framework_extension_point_duration_seconds"
-	// ExtensionPointLabelName is the label name of extension point metrics.
-	ExtensionPointLabelName = "extension_point"
 )
 
 var dataItemsDir = flag.String("data-items-dir", "", "destination directory for storing generated data items for perf dashboard")
@@ -146,7 +142,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
 type metricsCollectorConfig struct {
-	Metrics []string
+	MetricLabelMap map[string]string
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -169,19 +165,16 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for _, metric := range pc.Metrics {
-		itemCollection := collectHistogram(metric, pc.labels)
+	for metric, wantLabel := range pc.MetricLabelMap {
+		itemCollection := collectHistogram(metric, pc.labels, wantLabel)
 		dataItems = append(dataItems, itemCollection...)
 	}
 	return dataItems
 }
 
-func collectHistogram(metric string, labels map[string]string) []DataItem {
+func collectHistogram(metric string, labels map[string]string, wantLabel string) []DataItem {
 	var dataItems []DataItem
-	metricLabelMap := map[string]string{
-		FrameworkExtensionPointDurationMetricName: ExtensionPointLabelName,
-	}
-	histMap, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric, metricLabelMap)
+	histMap, err := testutil.GetHistogramFromGatherer(legacyregistry.DefaultGatherer, metric, wantLabel)
 	if err != nil {
 		klog.Error(err)
 		return nil
@@ -208,7 +201,7 @@ func collectHistogram(metric string, labels map[string]string) []DataItem {
 		for k, v := range labels {
 			labelMap[k] = v
 		}
-		dataItem := &DataItem{
+		dataItem := DataItem{
 			Labels: labelMap,
 			Data: map[string]float64{
 				"Perc50":  q50 * msFactor,
@@ -218,7 +211,7 @@ func collectHistogram(metric string, labels map[string]string) []DataItem {
 			},
 			Unit: "ms",
 		}
-		dataItems = append(dataItems, *dataItem)
+		dataItems = append(dataItems, dataItem)
 	}
 
 	return dataItems

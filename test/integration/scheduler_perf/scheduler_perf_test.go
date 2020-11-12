@@ -48,10 +48,10 @@ const (
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_framework_extension_point_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
+		MetricLabelMap: map[string]string{
+			"scheduler_e2e_scheduling_duration_seconds":            "",
+			"scheduler_framework_extension_point_duration_seconds": "extension_point",
+			"scheduler_pod_scheduling_duration_seconds":            "",
 		},
 	}
 )

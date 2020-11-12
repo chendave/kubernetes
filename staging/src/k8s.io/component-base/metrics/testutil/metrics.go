@@ -178,10 +178,9 @@ type Histogram struct {
 
 // GetHistogramFromGatherer collects a metric from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, metricLabelMap map[string]string) (map[string]Histogram, error) {
+func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, wantLabel string) (map[string]Histogram, error) {
 	var metricFamily *dto.MetricFamily
-	var histMap map[string]Histogram
-	histMap = make(map[string]Histogram)
+	histMap := make(map[string]Histogram)
 	m, err := gatherer.Gather()
 	if err != nil {
 		return histMap, err
@@ -202,14 +201,13 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, metr
 	}
 
 	metrics := metricFamily.GetMetric()
-	labelName, ok := metricLabelMap[metricName]
-	// This MetricFamily has the desired label defined, we should collect
-	// all the metrics from the MetricFamily which is associated with the
-	// the label.
-	if ok {
+	// This MetricFamily has the desired label defined, this should be a HistogramVec.
+	// All the metrics from the MetricFamily which is associated with the label will
+	// be collected.
+	if len(wantLabel) != 0 {
 		for _, metric := range metrics {
 			for _, label := range metric.GetLabel() {
-				if label.GetName() == labelName {
+				if label.GetName() == wantLabel {
 					name := fmt.Sprintf("%s/%s", metricName, label.GetValue())
 					histMap[name] = Histogram{
 						metric.GetHistogram(),
@@ -218,8 +216,9 @@ func GetHistogramFromGatherer(gatherer metrics.Gatherer, metricName string, metr
 			}
 		}
 	} else {
-		// Histograms are stored under the first index (based on observation).
-		// No label is provided, assume the first index is sufficient.
+		// If no label is defined for the metric, assume it's a Histogram instead of HistogramVec.
+		// Histograms are stored under the first index (based on observation) in this case.
+		// Get the first index is sufficient.
 		histMap[metricName] = Histogram{
 			metrics[0].GetHistogram(),
 		}
