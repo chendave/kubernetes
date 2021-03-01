@@ -298,18 +298,21 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 
 func mergePluginSets(defaultPluginSet, customPluginSet PluginSet) PluginSet {
 
-	disabledPlugins := sets.NewString()
+	disabledPlugins, enabledCustomPlugin := sets.NewString(), sets.NewString()
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)
+	}
+	for _, enabledPlugin := range customPluginSet.Enabled {
+		enabledCustomPlugin.Insert(enabledPlugin.Name)
 	}
 
 	var enabledPlugins []Plugin
 	if !disabledPlugins.Has("*") {
 		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
-			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
+			// custom plugin config will take precedence over default plugin config
+			if disabledPlugins.Has(defaultEnabledPlugin.Name) || enabledCustomPlugin.Has(defaultEnabledPlugin.Name) {
 				continue
 			}
-
 			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
 		}
 	}

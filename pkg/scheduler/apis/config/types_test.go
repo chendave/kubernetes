@@ -220,6 +220,30 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "CustomPluginOverwriteDefaultPlugin",
+			customPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1", Weight: 2},
+					},
+				},
+			},
+			defaultPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1"},
+					},
+				},
+			},
+			expectedPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1", Weight: 2},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
