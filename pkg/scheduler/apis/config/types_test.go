@@ -244,6 +244,34 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "order of plugins should be reserved",
+			customPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1", Weight: 2},
+					},
+				},
+			},
+			defaultPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1"},
+						{Name: "Plugin2"},
+						{Name: "Plugin3"},
+					},
+				},
+			},
+			expectedPlugins: &Plugins{
+				Filter: PluginSet{
+					Enabled: []Plugin{
+						{Name: "Plugin1", Weight: 2},
+						{Name: "Plugin2"},
+						{Name: "Plugin3"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

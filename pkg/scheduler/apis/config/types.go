@@ -296,22 +296,35 @@ func (p *Plugins) Apply(customPlugins *Plugins) {
 	p.PostBind = mergePluginSets(p.PostBind, customPlugins.PostBind)
 }
 
+type pluginIndex struct {
+	index  int
+	plugin Plugin
+}
+
 func mergePluginSets(defaultPluginSet, customPluginSet PluginSet) PluginSet {
 
-	disabledPlugins, enabledCustomPlugin := sets.NewString(), sets.NewString()
+	disabledPlugins := sets.NewString()
+	enabledCustomPlugins := make(map[string]pluginIndex)
 	for _, disabledPlugin := range customPluginSet.Disabled {
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
-	for _, enabledPlugin := range customPluginSet.Enabled {
-		enabledCustomPlugin.Insert(enabledPlugin.Name)
+
+	for index, enabledPlugin := range customPluginSet.Enabled {
+		enabledCustomPlugins[enabledPlugin.Name] = pluginIndex{index, enabledPlugin}
 	}
 
 	var enabledPlugins []Plugin
 	if !disabledPlugins.Has("*") {
 		for _, defaultEnabledPlugin := range defaultPluginSet.Enabled {
-			// custom plugin config will take precedence over default plugin config
-			if disabledPlugins.Has(defaultEnabledPlugin.Name) || enabledCustomPlugin.Has(defaultEnabledPlugin.Name) {
+			if disabledPlugins.Has(defaultEnabledPlugin.Name) {
 				continue
+			}
+			customPlugin, ok := enabledCustomPlugins[defaultEnabledPlugin.Name]
+			// The default plugin is explicitly re-configured, update the default plugin accordingly.
+			if ok {
+				defaultEnabledPlugin = customPlugin.plugin
+				// kick the plugin from original list to reserve the order of plugins.
+				customPluginSet.Enabled = append(customPluginSet.Enabled[:customPlugin.index], customPluginSet.Enabled[customPlugin.index+1:]...)
 			}
 			enabledPlugins = append(enabledPlugins, defaultEnabledPlugin)
 		}
